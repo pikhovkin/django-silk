@@ -29,7 +29,7 @@ class SummaryView(View):
         values_list = models.Request.objects.filter(*filters).values_list("view_name").annotate(max=Max('time_taken')).order_by('-max')[:5]
         requests = []
         for view_name, _ in values_list:
-            request = models.Request.objects.filter(view_name=view_name, *filters).order_by('-time_taken')[0]
+            request = models.Request.objects.filter(view_name=view_name, time_taken__isnull=False, *filters).order_by('-time_taken')[0]
             requests.append(request)
         return requests
 

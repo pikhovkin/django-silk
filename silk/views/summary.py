@@ -29,17 +29,20 @@ class SummaryView(View):
         values_list = models.Request.objects.filter(*filters).values_list("view_name").annotate(max=Max('time_taken')).order_by('-max')[:5]
         requests = []
         for view_name, _ in values_list:
-            request = models.Request.objects.filter(view_name=view_name, time_taken__isnull=False, *filters).order_by('-time_taken')[0]
-            requests.append(request)
+            request = models.Request.objects.filter(view_name=view_name, time_taken__isnull=False, *filters).order_by('-time_taken').first()
+            if request:
+                requests.append(request)
         return requests
 
     def _time_spent_in_db_by_view(self, filters):
         values_list = models.Request.objects.filter(*filters).values_list('view_name').annotate(t=Sum('queries__time_taken')).filter(t__gte=0).order_by('-t')[:5]
         requests = []
         for view, _ in values_list:
-            r = models.Request.objects.filter(view_name=view, *filters)[0]
-            r.t = models.Request.objects.filter(view_name=view, *filters).values('view_name').annotate(t=Sum('queries__time_taken')).order_by('-t')[0]['t']
-            requests.append(r)
+            request = models.Request.objects.filter(view_name=view, time_taken__isnull=False, *filters)
+            r = request.first()
+            if request:
+                r.t = request.values('view_name').annotate(t=Sum('queries__time_taken')).order_by('-t')[0]['t']
+                requests.append(r)
         return requests
 
     def _num_queries_by_view(self, filters):
@@ -47,12 +50,11 @@ class SummaryView(View):
         views = [r[0] for r in queryset[:6]]
         requests = []
         for view in views:
-            try:
-                r = models.Request.objects.filter(view_name=view, *filters)[0]
-                r.t = models.Request.objects.filter(view_name=view, *filters).values('view_name').annotate(t=Count('queries')).order_by('-t')[0]['t']
+            request = models.Request.objects.filter(view_name=view, time_taken__isnull=False, *filters)
+            r = request.first()
+            if r:
+                r.t = request.values('view_name').annotate(t=Count('queries')).order_by('-t')[0]['t']
                 requests.append(r)
-            except IndexError:
-                pass
         return requests
 
     def _create_context(self, request):
